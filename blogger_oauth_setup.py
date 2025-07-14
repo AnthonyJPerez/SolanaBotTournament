@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-WordPress OAuth Setup Helper
+Google Blogger OAuth Setup Helper
 
-This script helps you complete the WordPress.com OAuth setup process.
-Run this after configuring WORDPRESS_CLIENT_ID, WORDPRESS_CLIENT_SECRET, and WORDPRESS_SITE_URL in your .env file.
+This script helps you complete the Google Blogger OAuth setup process.
+Run this after configuring BLOGGER_CLIENT_ID, BLOGGER_CLIENT_SECRET, and BLOGGER_BLOG_ID in your .env file.
 """
 
 import os
@@ -19,31 +19,38 @@ if env_file.exists():
                 key, value = line.split('=', 1)
                 os.environ[key] = value
 
-from solana_bot_tournament.blog_publisher import WordPressPublisher
+from solana_bot_tournament.blog_publisher import BloggerPublisher
 
 def main():
-    print("WordPress.com OAuth Setup Helper")
+    print("Google Blogger OAuth Setup Helper")
     print("=" * 40)
     
-    publisher = WordPressPublisher()
+    publisher = BloggerPublisher()
     
     if not publisher.is_configured():
-        print("[ERROR] WordPress OAuth not configured.")
+        print("[ERROR] Blogger OAuth not configured.")
         print("Please set these environment variables in your .env file:")
-        print("- WORDPRESS_CLIENT_ID")
-        print("- WORDPRESS_CLIENT_SECRET")
-        print("- WORDPRESS_SITE_URL")
+        print("- BLOGGER_CLIENT_ID")
+        print("- BLOGGER_CLIENT_SECRET")
+        print("- BLOGGER_BLOG_ID")
+        print()
+        print("Setup instructions:")
+        print("1. Go to: https://console.developers.google.com/")
+        print("2. Create a new project or select existing one")
+        print("3. Enable the Blogger API v3")
+        print("4. Create OAuth 2.0 credentials")
+        print("5. Find your Blog ID from your Blogger dashboard URL")
         return
     
     print(f"[OK] Client ID: {publisher.client_id}")
-    print(f"[OK] Site URL: {publisher.site_url}")
+    print(f"[OK] Blog ID: {publisher.blog_id}")
     print(f"[OK] Client Secret: {'*' * len(publisher.client_secret)}")
     
     # Check if we already have a token
-    token_file = Path("wordpress_token.txt")
+    token_file = Path("blogger_token.txt")
     if token_file.exists():
         print(f"\n[OK] Access token found in {token_file}")
-        print("WordPress publishing should work!")
+        print("Blogger publishing should work!")
         return
     
     print("\n[INFO] No access token found. Starting OAuth flow...")
@@ -51,10 +58,8 @@ def main():
     auth_url = publisher.get_authorization_url()
     print(f"URL: {auth_url}")
     
-    print("\nStep 2: After authorizing, you'll be redirected to:")
-    print("https://localhost:8080/callback?code=AUTHORIZATION_CODE")
-    
-    print("\nStep 3: Copy the authorization code from the URL")
+    print("\nStep 2: Sign in to your Google account and click 'Allow'")
+    print("Step 3: Copy the authorization code from the page")
     code = input("Enter the authorization code: ").strip()
     
     if not code:
@@ -66,7 +71,7 @@ def main():
     
     if result["success"]:
         print("[OK] Access token saved successfully!")
-        print("WordPress publishing is now configured and ready to use.")
+        print("Blogger publishing is now configured and ready to use.")
     else:
         print(f"[ERROR] Failed to get access token: {result['error']}")
         print("Please check your authorization code and try again.")

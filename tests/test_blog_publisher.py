@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from solana_bot_tournament.blog_publisher import (
     BlogPost, MediumPublisher, DevToPublisher, HashnodePublisher,
-    WordPressPublisher, MultiPlatformPublisher, get_blog_status
+    BloggerPublisher, MultiPlatformPublisher, get_blog_status
 )
 
 
@@ -108,40 +108,41 @@ def test_hashnode_publisher_configured():
     assert publisher.is_configured()
 
 
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_ID', '')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_SECRET', '')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_SITE_URL', '')
-def test_wordpress_publisher_not_configured():
-    publisher = WordPressPublisher()
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_ID', '')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_SECRET', '')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_BLOG_ID', '')
+def test_blogger_publisher_not_configured():
+    publisher = BloggerPublisher()
     assert not publisher.is_configured()
 
 
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_ID', 'test_client_id')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_SECRET', 'test_client_secret')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_SITE_URL', 'test.wordpress.com')
-def test_wordpress_publisher_configured():
-    publisher = WordPressPublisher()
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_ID', 'test_client_id')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_SECRET', 'test_client_secret')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_BLOG_ID', '123456789')
+def test_blogger_publisher_configured():
+    publisher = BloggerPublisher()
     assert publisher.is_configured()
 
 
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_ID', 'test_client_id')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_SECRET', 'test_client_secret')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_SITE_URL', 'test.wordpress.com')
-def test_wordpress_oauth_authorization_url():
-    publisher = WordPressPublisher()
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_ID', 'test_client_id')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_SECRET', 'test_client_secret')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_BLOG_ID', '123456789')
+def test_blogger_oauth_authorization_url():
+    publisher = BloggerPublisher()
     auth_url = publisher.get_authorization_url()
     
     assert "client_id=test_client_id" in auth_url
     assert "response_type=code" in auth_url
-    assert "scope=global" in auth_url
-    assert auth_url.startswith("https://public-api.wordpress.com/oauth2/authorize")
+    assert "scope=https://www.googleapis.com/auth/blogger" in auth_url
+    assert "redirect_uri=urn:ietf:wg:oauth:2.0:oob" in auth_url
+    assert auth_url.startswith("https://accounts.google.com/o/oauth2/auth")
 
 
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_ID', 'test_client_id')
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_CLIENT_SECRET', 'test_client_secret') 
-@patch('solana_bot_tournament.blog_publisher.WORDPRESS_SITE_URL', 'test.wordpress.com')
-def test_wordpress_publish_without_token():
-    publisher = WordPressPublisher()
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_ID', 'test_client_id')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_SECRET', 'test_client_secret') 
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_BLOG_ID', '123456789')
+def test_blogger_publish_without_token():
+    publisher = BloggerPublisher()
     post = BlogPost("Test Title", "Test content", ["test"])
     
     # Mock the _get_access_token to return None (no token available)
@@ -150,14 +151,48 @@ def test_wordpress_publish_without_token():
         
         assert result["success"] is False
         assert "access token not available" in result["error"]
-        assert result["platform"] == "WordPress"
+        assert result["platform"] == "Blogger"
+
+
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_ID', 'test_client_id')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_SECRET', 'test_client_secret') 
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_BLOG_ID', '123456789')
+def test_blogger_token_validation():
+    publisher = BloggerPublisher()
+    
+    # Mock a successful validation response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    
+    with patch.object(publisher.session, 'get', return_value=mock_response):
+        assert publisher._validate_token("valid_token") is True
+    
+    # Mock a failed validation response
+    mock_response.status_code = 401
+    
+    with patch.object(publisher.session, 'get', return_value=mock_response):
+        assert publisher._validate_token("invalid_token") is False
+
+
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_ID', 'test_client_id')
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_CLIENT_SECRET', 'test_client_secret') 
+@patch('solana_bot_tournament.blog_publisher.BLOGGER_BLOG_ID', '123456789')
+def test_blogger_markdown_to_html():
+    publisher = BloggerPublisher()
+    
+    markdown = "# Header\n\n**bold** and *italic* text"
+    html = publisher._markdown_to_html(markdown)
+    
+    assert "<h1>" in html
+    assert "<strong>bold</strong>" in html
+    assert "<em>italic</em>" in html
 
 
 def test_multi_platform_publisher():
     publisher = MultiPlatformPublisher()
     
     # Test that all publisher types are included
-    expected_platforms = {"medium", "devto", "hashnode", "wordpress", "ghost"}
+    expected_platforms = {"medium", "devto", "hashnode", "blogger", "ghost"}
     assert set(publisher.publishers.keys()) == expected_platforms
 
 
@@ -218,7 +253,7 @@ def test_get_blog_status():
         assert status["medium"] is True
         assert status["devto"] is False
         assert "hashnode" in status
-        assert "wordpress" in status
+        assert "blogger" in status
         assert "ghost" in status
 
 

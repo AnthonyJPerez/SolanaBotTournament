@@ -13,7 +13,8 @@ import requests
 
 from .config import (
     MEDIUM_ACCESS_TOKEN, DEVTO_API_KEY, HASHNODE_ACCESS_TOKEN, HASHNODE_PUBLICATION_ID,
-    WORDPRESS_CLIENT_ID, WORDPRESS_CLIENT_SECRET, WORDPRESS_SITE_URL, GHOST_API_URL, GHOST_ADMIN_API_KEY
+    BLOGGER_CLIENT_ID, BLOGGER_CLIENT_SECRET, BLOGGER_BLOG_ID,
+    GHOST_API_URL, GHOST_ADMIN_API_KEY
 )
 
 
@@ -230,68 +231,134 @@ class HashnodePublisher(BlogPublisher):
             return {"success": False, "error": str(e), "platform": "Hashnode"}
 
 
-class WordPressPublisher(BlogPublisher):
-    """Publisher for WordPress.com using OAuth"""
+class BloggerPublisher(BlogPublisher):
+    """Publisher for Google Blogger using OAuth 2.0"""
     
     def __init__(self):
         super().__init__()
-        self.client_id = WORDPRESS_CLIENT_ID
-        self.client_secret = WORDPRESS_CLIENT_SECRET
-        self.site_url = WORDPRESS_SITE_URL
-        self.base_url = "https://public-api.wordpress.com/rest/v1.1"
-        self.oauth_url = "https://public-api.wordpress.com/oauth2"
+        self.client_id = BLOGGER_CLIENT_ID
+        self.client_secret = BLOGGER_CLIENT_SECRET
+        self.blog_id = BLOGGER_BLOG_ID
+        self.base_url = "https://www.googleapis.com/blogger/v3"
+        self.oauth_url = "https://accounts.google.com/o/oauth2"
+        self.scope = "https://www.googleapis.com/auth/blogger"
         self._access_token = None
         
     def is_configured(self) -> bool:
-        return bool(self.client_id and self.client_secret and self.site_url)
+        return bool(self.client_id and self.client_secret and self.blog_id)
     
     def _get_access_token(self) -> Optional[str]:
-        """Get access token using OAuth client credentials flow.
-        
-        Note: For automated publishing, you would typically need to implement
-        a proper OAuth flow with user authorization. This is a simplified
-        implementation that assumes you have the necessary credentials.
-        """
+        """Get access token dynamically using OAuth flow."""
         if self._access_token:
             return self._access_token
             
-        # For client credentials flow (if supported) or saved token
-        # In a real implementation, you would:
-        # 1. Redirect user to WordPress authorization URL
-        # 2. Handle the callback with authorization code
-        # 3. Exchange code for access token
-        # 4. Store token securely for reuse
-        
-        # For now, we'll assume the access token is manually obtained
-        # and stored in a file or environment variable
-        token_file = Path("wordpress_token.txt")
+        # Check for existing token file
+        token_file = Path("blogger_token.txt")
         if token_file.exists():
-            with open(token_file, 'r') as f:
-                self._access_token = f.read().strip()
-                return self._access_token
+            try:
+                with open(token_file, 'r') as f:
+                    token_data = f.read().strip()
+                    # Validate token by making a test API call
+                    if token_data and len(token_data) > 20:
+                        if self._validate_token(token_data):
+                            self._access_token = token_data
+                            return self._access_token
+                        else:
+                            logging.info("Existing Blogger token is invalid or expired")
+                            # Remove invalid token file
+                            token_file.unlink()
+            except Exception as e:
+                logging.warning(f"Error reading token file: {e}")
         
-        # If no stored token, log instructions for manual setup
-        logging.warning(
-            "WordPress OAuth token not found. Please follow these steps:\n"
-            "1. Visit: https://developer.wordpress.com/apps/\n"
-            "2. Create or select your app\n"
-            "3. Use OAuth flow to get access token\n"
-            "4. Save token to 'wordpress_token.txt' file"
-        )
-        return None
+        # No valid token found - initiate OAuth flow
+        logging.info("No valid Blogger token found. Initiating OAuth flow...")
+        return self._initiate_oauth_flow()
+    
+    def _initiate_oauth_flow(self) -> Optional[str]:
+        """Initiate OAuth flow to get access token."""
+        try:
+            redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
+            auth_url = self.get_authorization_url(redirect_uri)
+            
+            print("\n" + "="*60)
+            print("BLOGGER OAUTH AUTHORIZATION REQUIRED")
+            print("="*60)
+            print("To publish to Blogger, please complete this one-time setup:")
+            print()
+            print("1. Open this URL in your browser:")
+            print(f"   {auth_url}")
+            print()
+            print("2. Sign in to your Google account and click 'Allow'")
+            print("3. Copy the authorization code from the page")
+            print()
+            
+            # Get authorization code from user
+            code = input("Enter the authorization code: ").strip()
+            
+            if not code:
+                logging.error("No authorization code provided")
+                return None
+            
+            # Exchange code for token
+            result = self.exchange_code_for_token(code, redirect_uri)
+            
+            if result["success"]:
+                token = result["token"]["access_token"]
+                
+                # Save token for future use
+                token_file = Path("blogger_token.txt")
+                with open(token_file, 'w') as f:
+                    f.write(token)
+                
+                print("\n[OK] Blogger authorization successful!")
+                print("Token saved for future use.")
+                self._access_token = token
+                return token
+            else:
+                logging.error(f"Failed to exchange code for token: {result['error']}")
+                return None
+                
+        except KeyboardInterrupt:
+            print("\n[INFO] OAuth flow cancelled by user")
+            return None
+        except Exception as e:
+            logging.error(f"Error in OAuth flow: {e}")
+            return None
+    
+    def _validate_token(self, token: str) -> bool:
+        """Validate access token by making a test API call."""
+        try:
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Make a simple API call to validate the token
+            response = self.session.get(
+                f"{self.base_url}/blogs/{self.blog_id}",
+                headers=headers,
+                timeout=10
+            )
+            
+            # Token is valid if we get a successful response
+            return response.status_code == 200
+            
+        except Exception as e:
+            logging.debug(f"Token validation failed: {e}")
+            return False
     
     def publish(self, post: BlogPost) -> Dict[str, any]:
-        """Publish to WordPress.com"""
+        """Publish to Blogger"""
         if not self.is_configured():
-            return {"success": False, "error": "WordPress OAuth not configured"}
+            return {"success": False, "error": "Blogger OAuth not configured"}
         
         # Get access token
         access_token = self._get_access_token()
         if not access_token:
             return {
                 "success": False, 
-                "error": "WordPress access token not available. Please complete OAuth flow.",
-                "platform": "WordPress"
+                "error": "Blogger access token not available. Please complete OAuth flow.",
+                "platform": "Blogger"
             }
         
         try:
@@ -301,46 +368,80 @@ class WordPressPublisher(BlogPublisher):
                 "Content-Type": "application/json"
             }
             
+            # Convert markdown to HTML for Blogger
+            content_html = self._markdown_to_html(post.content)
+            
             post_data = {
                 "title": post.title,
-                "content": post.content,
-                "status": "publish" if post.published else "draft",
-                "format": "standard",
-                "tags": ",".join(post.tags)
+                "content": content_html,
+                "labels": post.tags
             }
             
+            # Create the post
             response = self.session.post(
-                f"{self.base_url}/sites/{self.site_url}/posts/new",
+                f"{self.base_url}/blogs/{self.blog_id}/posts",
                 json=post_data,
                 headers=headers
             )
             response.raise_for_status()
             
             result = response.json()
+            
+            # Publish the post if it should be published
+            if post.published:
+                publish_response = self.session.post(
+                    f"{self.base_url}/blogs/{self.blog_id}/posts/{result['id']}/publish",
+                    headers=headers
+                )
+                publish_response.raise_for_status()
+                result = publish_response.json()
+            
             return {
                 "success": True,
-                "url": result["URL"],
-                "id": result["ID"],
-                "platform": "WordPress"
+                "url": result["url"],
+                "id": result["id"],
+                "platform": "Blogger"
             }
             
         except Exception as e:
-            logging.error(f"Failed to publish to WordPress: {e}")
-            return {"success": False, "error": str(e), "platform": "WordPress"}
+            logging.error(f"Failed to publish to Blogger: {e}")
+            return {"success": False, "error": str(e), "platform": "Blogger"}
     
-    def get_authorization_url(self, redirect_uri: str = "https://localhost:8080/callback") -> str:
-        """Generate OAuth authorization URL for manual setup."""
+    def _markdown_to_html(self, markdown_content: str) -> str:
+        """Convert markdown to HTML for Blogger."""
+        # Simple markdown to HTML conversion
+        html = markdown_content
+        
+        # Convert headers
+        html = html.replace('# ', '<h1>').replace('\n', '</h1>\n', 1) if '# ' in html else html
+        html = html.replace('## ', '<h2>').replace('\n', '</h2>\n', 1) if '## ' in html else html
+        html = html.replace('### ', '<h3>').replace('\n', '</h3>\n', 1) if '### ' in html else html
+        
+        # Convert bold and italic
+        import re
+        html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html)
+        html = re.sub(r'\*(.*?)\*', r'<em>\1</em>', html)
+        
+        # Convert line breaks to paragraphs
+        paragraphs = html.split('\n\n')
+        html = ''.join(f'<p>{p}</p>' for p in paragraphs if p.strip())
+        
+        return html
+    
+    def get_authorization_url(self, redirect_uri: str = "urn:ietf:wg:oauth:2.0:oob") -> str:
+        """Generate OAuth authorization URL."""
         params = {
             "client_id": self.client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": "global"
+            "scope": self.scope,
+            "access_type": "offline"
         }
         
         query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-        return f"{self.oauth_url}/authorize?{query_string}"
+        return f"{self.oauth_url}/auth?{query_string}"
     
-    def exchange_code_for_token(self, code: str, redirect_uri: str = "https://localhost:8080/callback") -> Dict:
+    def exchange_code_for_token(self, code: str, redirect_uri: str = "urn:ietf:wg:oauth:2.0:oob") -> Dict:
         """Exchange authorization code for access token."""
         data = {
             "client_id": self.client_id,
@@ -356,7 +457,7 @@ class WordPressPublisher(BlogPublisher):
             token_data = response.json()
             
             # Save token to file for future use
-            token_file = Path("wordpress_token.txt")
+            token_file = Path("blogger_token.txt")
             with open(token_file, 'w') as f:
                 f.write(token_data["access_token"])
             
@@ -455,7 +556,7 @@ class MultiPlatformPublisher:
             "medium": MediumPublisher(),
             "devto": DevToPublisher(),
             "hashnode": HashnodePublisher(),
-            "wordpress": WordPressPublisher(),
+            "blogger": BloggerPublisher(),
             "ghost": GhostPublisher()
         }
     

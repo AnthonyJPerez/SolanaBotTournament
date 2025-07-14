@@ -46,9 +46,9 @@ MEDIUM_ACCESS_TOKEN = os.getenv("MEDIUM_ACCESS_TOKEN", "").strip()
 DEVTO_API_KEY = os.getenv("DEVTO_API_KEY", "").strip()
 HASHNODE_ACCESS_TOKEN = os.getenv("HASHNODE_ACCESS_TOKEN", "").strip()
 HASHNODE_PUBLICATION_ID = os.getenv("HASHNODE_PUBLICATION_ID", "").strip()
-WORDPRESS_CLIENT_ID = os.getenv("WORDPRESS_CLIENT_ID", "").strip()
-WORDPRESS_CLIENT_SECRET = os.getenv("WORDPRESS_CLIENT_SECRET", "").strip()
-WORDPRESS_SITE_URL = os.getenv("WORDPRESS_SITE_URL", "").strip()
+BLOGGER_CLIENT_ID = os.getenv("BLOGGER_CLIENT_ID", "").strip()
+BLOGGER_CLIENT_SECRET = os.getenv("BLOGGER_CLIENT_SECRET", "").strip()
+BLOGGER_BLOG_ID = os.getenv("BLOGGER_BLOG_ID", "").strip()
 GHOST_API_URL = os.getenv("GHOST_API_URL", "").strip()
 GHOST_ADMIN_API_KEY = os.getenv("GHOST_ADMIN_API_KEY", "").strip()
 
@@ -88,7 +88,7 @@ blog_platforms = [
     ("Medium", MEDIUM_ACCESS_TOKEN),
     ("Dev.to", DEVTO_API_KEY),
     ("Hashnode", HASHNODE_ACCESS_TOKEN and HASHNODE_PUBLICATION_ID),
-    ("WordPress", WORDPRESS_CLIENT_ID and WORDPRESS_CLIENT_SECRET and WORDPRESS_SITE_URL),
+    ("Blogger", BLOGGER_CLIENT_ID and BLOGGER_CLIENT_SECRET and BLOGGER_BLOG_ID),
     ("Ghost", GHOST_API_URL and GHOST_ADMIN_API_KEY)
 ]
 

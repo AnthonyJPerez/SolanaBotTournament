@@ -157,26 +157,26 @@ def setup_environment():
             "HASHNODE_PUBLICATION_ID="
         ])
     
-    # WordPress
-    print("\\nWordPress.com OAuth setup:")
-    print("1. Visit: https://developer.wordpress.com/apps/")
-    print("2. Create a new app or use existing one")
-    print("3. Get your Client ID and Client Secret")
-    wp_client_id = input("Enter WordPress.com Client ID (or press Enter to skip): ").strip()
-    if wp_client_id:
-        wp_client_secret = input("Enter WordPress.com Client Secret: ").strip()
-        wp_site = input("Enter WordPress site URL (e.g., your-site.wordpress.com): ").strip()
+    # Blogger
+    print("\\nGoogle Blogger OAuth setup:")
+    print("1. Visit: https://console.developers.google.com/")
+    print("2. Create project and enable Blogger API v3")
+    print("3. Create OAuth 2.0 credentials")
+    blogger_client_id = input("Enter Google OAuth Client ID (or press Enter to skip): ").strip()
+    if blogger_client_id:
+        blogger_client_secret = input("Enter Google OAuth Client Secret: ").strip()
+        blogger_blog_id = input("Enter Blogger Blog ID (from your blog URL): ").strip()
         configs.extend([
-            f"WORDPRESS_CLIENT_ID={wp_client_id}",
-            f"WORDPRESS_CLIENT_SECRET={wp_client_secret}",
-            f"WORDPRESS_SITE_URL={wp_site}"
+            f"BLOGGER_CLIENT_ID={blogger_client_id}",
+            f"BLOGGER_CLIENT_SECRET={blogger_client_secret}",
+            f"BLOGGER_BLOG_ID={blogger_blog_id}"
         ])
-        print("NOTE: You'll need to complete OAuth flow separately to get access token")
+        print("NOTE: Run 'python blogger_oauth_setup.py' to complete OAuth flow")
     else:
         configs.extend([
-            "WORDPRESS_CLIENT_ID=",
-            "WORDPRESS_CLIENT_SECRET=",
-            "WORDPRESS_SITE_URL="
+            "BLOGGER_CLIENT_ID=",
+            "BLOGGER_CLIENT_SECRET=",
+            "BLOGGER_BLOG_ID="
         ])
     
     # Ghost
@@ -282,7 +282,7 @@ def validate_environment():
         'Medium': env_vars.get('MEDIUM_ACCESS_TOKEN', ''),
         'Dev.to': env_vars.get('DEVTO_API_KEY', ''),
         'Hashnode': env_vars.get('HASHNODE_ACCESS_TOKEN', ''),
-        'WordPress': env_vars.get('WORDPRESS_CLIENT_ID', '') and env_vars.get('WORDPRESS_CLIENT_SECRET', ''),
+        'Blogger': env_vars.get('BLOGGER_CLIENT_ID', '') and env_vars.get('BLOGGER_CLIENT_SECRET', ''),
         'Ghost': env_vars.get('GHOST_API_URL', '')
     }
     
@@ -298,11 +298,11 @@ def validate_environment():
     if env_vars.get('HASHNODE_ACCESS_TOKEN', '') and not env_vars.get('HASHNODE_PUBLICATION_ID', ''):
         issues.append("[WARNING] Hashnode token provided but publication ID missing")
     
-    if env_vars.get('WORDPRESS_CLIENT_ID', '') and not env_vars.get('WORDPRESS_CLIENT_SECRET', ''):
-        issues.append("[WARNING] WordPress Client ID provided but Client Secret missing")
+    if env_vars.get('BLOGGER_CLIENT_ID', '') and not env_vars.get('BLOGGER_CLIENT_SECRET', ''):
+        issues.append("[WARNING] Blogger Client ID provided but Client Secret missing")
     
-    if env_vars.get('WORDPRESS_CLIENT_ID', '') and not env_vars.get('WORDPRESS_SITE_URL', ''):
-        issues.append("[WARNING] WordPress Client ID provided but site URL missing")
+    if env_vars.get('BLOGGER_CLIENT_ID', '') and not env_vars.get('BLOGGER_BLOG_ID', ''):
+        issues.append("[WARNING] Blogger Client ID provided but Blog ID missing")
     
     if env_vars.get('GHOST_API_URL', '') and not env_vars.get('GHOST_ADMIN_API_KEY', ''):
         issues.append("[WARNING] Ghost URL provided but admin API key missing")
