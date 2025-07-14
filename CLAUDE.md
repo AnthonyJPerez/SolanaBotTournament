@@ -13,6 +13,13 @@ source .venv/bin/activate          # Unix/macOS
 
 # Install in editable mode
 pip install -e .
+
+# Configure environment variables (interactive)
+python setup_env.py
+
+# Or manually copy and edit:
+# cp .env.example .env
+# # Edit .env with your API keys
 ```
 
 ### Running the Application

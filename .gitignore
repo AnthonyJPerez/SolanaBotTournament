@@ -205,3 +205,29 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# =============================================================================
+# Solana Bot Tournament Specific
+# =============================================================================
+
+# Environment files with API keys and secrets
+.env.local
+.env.production
+.env.staging
+
+# Data files that may contain sensitive wallet addresses or trading data
+balance_history.json
+trade_log.json
+
+# Generated content and reports
+blog_posts/
+day_*.md
+week_*.md
+*.png
+*.jpg
+*.jpeg
+
+# Chart files
+*_chart.png
+daily_*.png
+weekly_*.png

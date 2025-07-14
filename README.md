@@ -14,9 +14,9 @@ source .venv/bin/activate
 # 2. install package
 pip install -e .  # editable install
 
-# 3. set required env vars (example using .envrc or in shell)
-export HELIUS_API_KEY="<key>"
-export TWITTER_API_KEY="<key>"  # etc. see .env.example
+# 3. configure environment variables
+python setup_env.py  # interactive setup
+# OR manually copy .env.example to .env and edit
 
 # 4. run a daily cycle
 solana-bot daily
