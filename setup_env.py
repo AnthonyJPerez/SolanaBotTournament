@@ -8,6 +8,19 @@ import shutil
 from pathlib import Path
 
 
+def validate_solana_address(address: str) -> bool:
+    """Basic validation for Solana address format."""
+    if not address:
+        return False
+    # Solana addresses are base58 encoded, typically 32-44 characters
+    # This is a basic check - more sophisticated validation could be added
+    if len(address) < 32 or len(address) > 44:
+        return False
+    # Check for valid base58 characters (excluding 0, O, I, l)
+    valid_chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    return all(c in valid_chars for c in address)
+
+
 def setup_environment():
     """Interactive setup for environment variables."""
     print("Solana Bot Tournament - Environment Setup")
@@ -84,6 +97,102 @@ def setup_environment():
             "TWITTER_ACCESS_SECRET="
         ])
     
+    # Required: Bot Wallet Addresses
+    print("\\nBOT WALLET ADDRESSES (Required for real data)")
+    print("Enter the Solana wallet addresses for each bot")
+    print("These are public addresses used to track transactions")
+    print("(Leave blank if you don't have a specific bot's address yet)")
+    
+    # Helper function to get and validate wallet address
+    def get_wallet_address(bot_name: str) -> str:
+        while True:
+            addr = input(f"Enter {bot_name} bot wallet address: ").strip()
+            if not addr:
+                print(f"[INFO] Skipping {bot_name} wallet address")
+                return ""
+            if validate_solana_address(addr):
+                print(f"[OK] Valid Solana address for {bot_name}")
+                return addr
+            else:
+                print("[ERROR] Invalid Solana address format. Please try again.")
+                print("Solana addresses are 32-44 characters long, base58 encoded")
+                retry = input("Try again? (y/N): ").lower().strip()
+                if retry != 'y':
+                    return ""
+    
+    trojan_addr = get_wallet_address("Trojan")
+    tradewiz_addr = get_wallet_address("TradeWiz") 
+    frogbot_addr = get_wallet_address("FrogBot")
+    
+    configs.extend([
+        f"TROJAN_WALLET_ADDRESS={trojan_addr}",
+        f"TRADEWIZ_WALLET_ADDRESS={tradewiz_addr}",
+        f"FROGBOT_WALLET_ADDRESS={frogbot_addr}"
+    ])
+    
+    # Optional: Blog Publishing
+    print("\\nBLOG PUBLISHING (Optional)")
+    print("Configure any platforms you want to publish tournament reports to")
+    print("You can skip all of these by pressing Enter")
+    
+    # Medium
+    medium_token = input("Enter Medium access token (or press Enter to skip): ").strip()
+    configs.append(f"MEDIUM_ACCESS_TOKEN={medium_token}")
+    
+    # Dev.to
+    devto_key = input("Enter Dev.to API key (or press Enter to skip): ").strip()
+    configs.append(f"DEVTO_API_KEY={devto_key}")
+    
+    # Hashnode
+    hashnode_token = input("Enter Hashnode access token (or press Enter to skip): ").strip()
+    if hashnode_token:
+        hashnode_pub_id = input("Enter Hashnode publication ID: ").strip()
+        configs.extend([
+            f"HASHNODE_ACCESS_TOKEN={hashnode_token}",
+            f"HASHNODE_PUBLICATION_ID={hashnode_pub_id}"
+        ])
+    else:
+        configs.extend([
+            "HASHNODE_ACCESS_TOKEN=",
+            "HASHNODE_PUBLICATION_ID="
+        ])
+    
+    # WordPress
+    print("\\nWordPress.com OAuth setup:")
+    print("1. Visit: https://developer.wordpress.com/apps/")
+    print("2. Create a new app or use existing one")
+    print("3. Get your Client ID and Client Secret")
+    wp_client_id = input("Enter WordPress.com Client ID (or press Enter to skip): ").strip()
+    if wp_client_id:
+        wp_client_secret = input("Enter WordPress.com Client Secret: ").strip()
+        wp_site = input("Enter WordPress site URL (e.g., your-site.wordpress.com): ").strip()
+        configs.extend([
+            f"WORDPRESS_CLIENT_ID={wp_client_id}",
+            f"WORDPRESS_CLIENT_SECRET={wp_client_secret}",
+            f"WORDPRESS_SITE_URL={wp_site}"
+        ])
+        print("NOTE: You'll need to complete OAuth flow separately to get access token")
+    else:
+        configs.extend([
+            "WORDPRESS_CLIENT_ID=",
+            "WORDPRESS_CLIENT_SECRET=",
+            "WORDPRESS_SITE_URL="
+        ])
+    
+    # Ghost
+    ghost_url = input("Enter Ghost blog URL (or press Enter to skip): ").strip()
+    if ghost_url:
+        ghost_key = input("Enter Ghost admin API key: ").strip()
+        configs.extend([
+            f"GHOST_API_URL={ghost_url}",
+            f"GHOST_ADMIN_API_KEY={ghost_key}"
+        ])
+    else:
+        configs.extend([
+            "GHOST_API_URL=",
+            "GHOST_ADMIN_API_KEY="
+        ])
+    
     # Write configuration
     with open(env_file, 'w') as f:
         f.write("# Solana Bot Tournament - Environment Configuration\n")
@@ -145,6 +254,58 @@ def validate_environment():
         issues.append("[WARNING] Incomplete Twitter configuration (need all 4 keys)")
     elif all(twitter_keys):
         print("[OK] Twitter posting configured")
+    
+    # Check wallet addresses
+    wallet_vars = ['TROJAN_WALLET_ADDRESS', 'TRADEWIZ_WALLET_ADDRESS', 'FROGBOT_WALLET_ADDRESS']
+    configured_wallets = []
+    missing_wallets = []
+    
+    for wallet_var in wallet_vars:
+        wallet_addr = env_vars.get(wallet_var, '')
+        bot_name = wallet_var.replace('_WALLET_ADDRESS', '')
+        
+        if not wallet_addr or wallet_addr.startswith('your_'):
+            missing_wallets.append(bot_name)
+        elif validate_solana_address(wallet_addr):
+            configured_wallets.append(bot_name)
+        else:
+            issues.append(f"[WARNING] Invalid Solana address format for {bot_name}: {wallet_addr[:10]}...")
+    
+    if configured_wallets:
+        print(f"[OK] Configured wallet addresses: {', '.join(configured_wallets)}")
+    
+    if missing_wallets:
+        issues.append(f"[WARNING] Missing wallet addresses for: {', '.join(missing_wallets)}")
+    
+    # Check blog platform configurations
+    blog_platforms = {
+        'Medium': env_vars.get('MEDIUM_ACCESS_TOKEN', ''),
+        'Dev.to': env_vars.get('DEVTO_API_KEY', ''),
+        'Hashnode': env_vars.get('HASHNODE_ACCESS_TOKEN', ''),
+        'WordPress': env_vars.get('WORDPRESS_CLIENT_ID', '') and env_vars.get('WORDPRESS_CLIENT_SECRET', ''),
+        'Ghost': env_vars.get('GHOST_API_URL', '')
+    }
+    
+    configured_blogs = [platform for platform, key in blog_platforms.items() 
+                       if key and not key.startswith('your_')]
+    
+    if configured_blogs:
+        print(f"[OK] Blog publishing configured for: {', '.join(configured_blogs)}")
+    else:
+        print("[INFO] No blog platforms configured (reports will only be saved locally)")
+    
+    # Check for incomplete blog configurations
+    if env_vars.get('HASHNODE_ACCESS_TOKEN', '') and not env_vars.get('HASHNODE_PUBLICATION_ID', ''):
+        issues.append("[WARNING] Hashnode token provided but publication ID missing")
+    
+    if env_vars.get('WORDPRESS_CLIENT_ID', '') and not env_vars.get('WORDPRESS_CLIENT_SECRET', ''):
+        issues.append("[WARNING] WordPress Client ID provided but Client Secret missing")
+    
+    if env_vars.get('WORDPRESS_CLIENT_ID', '') and not env_vars.get('WORDPRESS_SITE_URL', ''):
+        issues.append("[WARNING] WordPress Client ID provided but site URL missing")
+    
+    if env_vars.get('GHOST_API_URL', '') and not env_vars.get('GHOST_ADMIN_API_KEY', ''):
+        issues.append("[WARNING] Ghost URL provided but admin API key missing")
     
     if issues:
         print("\n[WARNING] Configuration issues found:")

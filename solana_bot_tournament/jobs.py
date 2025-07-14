@@ -16,6 +16,7 @@ from .persistence import load_json, save_json
 from .alerting import alert_low_win, alert_drawdown, tweet_daily, tweet_weekly
 from .charts import balance_chart
 from .templates import DAILY, WEEKLY
+from .blog_publisher import publish_blog_post
 
 
 def job_daily() -> bool:
@@ -101,7 +102,7 @@ def job_daily() -> bool:
         return False
     
     # Generate daily report
-    generate_daily_report(day_number, bot_metrics, balance_history)
+    report_content = generate_daily_report(day_number, bot_metrics, balance_history)
     
     # Create and tweet chart with error handling
     try:
@@ -115,6 +116,26 @@ def job_daily() -> bool:
             logging.error("Failed to generate daily chart")
     except Exception as e:
         logging.error(f"Error generating chart or tweet: {e}")
+    
+    # Publish to blogs
+    try:
+        blog_title = f"Day {day_number} - Solana Bot Tournament Results"
+        blog_tags = ["solana", "trading", "bots", "cryptocurrency", "defi", "tournament"]
+        
+        blog_results = publish_blog_post(blog_title, report_content, blog_tags)
+        
+        if blog_results:
+            successful_publications = [platform for platform, result in blog_results.items() 
+                                     if result.get("success")]
+            if successful_publications:
+                logging.info(f"Published to blogs: {', '.join(successful_publications)}")
+            else:
+                logging.warning("Failed to publish to any blog platforms")
+        else:
+            logging.info("No blog platforms configured for publishing")
+            
+    except Exception as e:
+        logging.error(f"Error publishing to blogs: {e}")
     
     print(f"Daily job completed for Day {day_number}")
     return True
@@ -142,7 +163,7 @@ def job_weekly(end_day: Optional[int] = None) -> bool:
         bot_weekly_metrics[bot_name] = compute_metrics(bot_trades)
     
     # Generate weekly report
-    generate_weekly_report(end_day, bot_weekly_metrics, balance_history)
+    report_content = generate_weekly_report(end_day, bot_weekly_metrics, balance_history)
     
     # Create and tweet weekly chart
     chart_path = BLOG_DIR / f"week_ending_day_{end_day}_chart.png"
@@ -150,6 +171,27 @@ def job_weekly(end_day: Optional[int] = None) -> bool:
     
     tweet_message = f"Week {end_day//7 + 1} Summary! 📊 Bot tournament weekly recap"
     tweet_weekly(tweet_message, chart_path)
+    
+    # Publish weekly summary to blogs
+    try:
+        week_num = end_day // 7 + 1
+        blog_title = f"Week {week_num} - Solana Bot Tournament Weekly Summary"
+        blog_tags = ["solana", "trading", "bots", "cryptocurrency", "defi", "weekly-summary"]
+        
+        blog_results = publish_blog_post(blog_title, report_content, blog_tags)
+        
+        if blog_results:
+            successful_publications = [platform for platform, result in blog_results.items() 
+                                     if result.get("success")]
+            if successful_publications:
+                logging.info(f"Published weekly summary to blogs: {', '.join(successful_publications)}")
+            else:
+                logging.warning("Failed to publish weekly summary to any blog platforms")
+        else:
+            logging.info("No blog platforms configured for weekly publishing")
+            
+    except Exception as e:
+        logging.error(f"Error publishing weekly summary to blogs: {e}")
     
     print(f"Weekly job completed ending on Day {end_day}")
     return True
@@ -216,8 +258,8 @@ def extract_symbol_from_transaction(tx: dict) -> str:
     return "UNKNOWN"
 
 
-def generate_daily_report(day: int, metrics: Dict, balance_history: Dict):
-    """Generate daily markdown report."""
+def generate_daily_report(day: int, metrics: Dict, balance_history: Dict) -> str:
+    """Generate daily markdown report and return content."""
     report_content = DAILY.render(
         day=day,
         metrics=metrics,
@@ -225,14 +267,15 @@ def generate_daily_report(day: int, metrics: Dict, balance_history: Dict):
     )
     
     report_path = BLOG_DIR / f"day_{day}_report.md"
-    with open(report_path, 'w') as f:
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write(report_content)
     
     print(f"Generated daily report: {report_path}")
+    return report_content
 
 
-def generate_weekly_report(end_day: int, metrics: Dict, balance_history: Dict):
-    """Generate weekly markdown summary."""
+def generate_weekly_report(end_day: int, metrics: Dict, balance_history: Dict) -> str:
+    """Generate weekly markdown summary and return content."""
     week_num = end_day // 7 + 1
     report_content = WEEKLY.render(
         wk=week_num,
@@ -242,10 +285,11 @@ def generate_weekly_report(end_day: int, metrics: Dict, balance_history: Dict):
     )
     
     report_path = BLOG_DIR / f"week_{week_num}_summary.md"
-    with open(report_path, 'w') as f:
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write(report_content)
     
     print(f"Generated weekly report: {report_path}")
+    return report_content
 
 
 def trade_to_dict(trade: Trade) -> dict:

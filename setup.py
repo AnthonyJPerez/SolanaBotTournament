@@ -16,6 +16,7 @@ setup(
         "tweepy>=4.14",
         "jinja2>=3.1",
         "pytest>=8.2",
+        "PyJWT>=2.8.0",  # For Ghost blog publishing
     ],
     entry_points={
         "console_scripts": [
